@@ -1,0 +1,129 @@
+from datetime import date, timedelta
+
+import pytest
+
+from wahlbot.agent.response_parser import AgentRecommendation
+from wahlbot.config import DEFAULT_CONFIG
+from wahlbot.decision.engine import build_trade_proposal
+from wahlbot.decision.ev_calculator import expected_value_yes
+from wahlbot.decision.filter import historical_base_rate, is_close_race_market, prefilter_candidate
+from wahlbot.polls.aggregator import PollSnapshot, build_fallback_poll_snapshot
+from wahlbot.scanner.market_parser import Market
+
+
+def test_historical_base_rate():
+    assert historical_base_rate(4.8) == pytest.approx(0.4557641189, rel=1e-6)
+
+
+def test_prefilter_candidate_edge_true():
+    poll = PollSnapshot(
+        party="AFD",
+        country="DE",
+        election="Brandenburg",
+        latest_poll_pct=4.8,
+        poll_trend="rising",
+        poll_date=date(2025, 8, 1),
+        institute="Forsa",
+        historical_bias_correction=0.4,
+    )
+    decision, base_rate = prefilter_candidate(
+        poll=poll,
+        market_probability=0.61,
+        poll_window_min_pct=3.0,
+        poll_window_max_pct=7.0,
+        min_edge_pct=10,
+        has_open_position=False,
+        close_race_research_enabled=True,
+        close_race_band_pct=8.0,
+    )
+    assert decision is True
+    assert base_rate == pytest.approx(historical_base_rate(4.8) + 0.03, rel=1e-6)
+
+
+def test_close_race_market_is_selected_for_research():
+    assert is_close_race_market(0.51, close_race_band_pct=8.0) is True
+
+
+def test_build_fallback_poll_snapshot_for_state_election_market():
+    market = Market(
+        market_id="m2",
+        title="Will CDU win Rheinland-Pfalz landtagswahl?",
+        platform="kalshi",
+        market_probability=0.49,
+        yes_ask_cents=49,
+        volume_usd=10000,
+        resolution_date=date(2026, 3, 1),
+    )
+    snapshot = build_fallback_poll_snapshot(market)
+    assert snapshot is not None
+    assert snapshot.country == "DE"
+
+
+def test_expected_value_yes_positive():
+    assert expected_value_yes(0.65, 50) > 0
+
+
+def test_build_trade_proposal():
+    market = Market(
+        market_id="m1",
+        title="Will AfD exceed 5% in Brandenburg election?",
+        platform="kalshi",
+        market_probability=0.61,
+        yes_ask_cents=62,
+        volume_usd=18400,
+        resolution_date=date(2025, 9, 14),
+    )
+    agent = AgentRecommendation(
+        recommendation="BUY_NO",
+        confidence=0.7,
+        adjusted_probability=0.38,
+        reasoning="x",
+        key_factors=[],
+        sources=[],
+    )
+    proposal = build_trade_proposal(market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG)
+    assert proposal is not None
+    assert proposal.suggested_stake_usd <= DEFAULT_CONFIG.max_stake_usd
+
+
+def test_run_once_returns_rows_and_writes_log(tmp_path, monkeypatch):
+    from wahlbot.decision.engine import TradeProposal
+    from wahlbot.main import run_once
+    from wahlbot.scanner.kalshi import KalshiClient
+    from wahlbot.scanner.market_parser import Market
+    import wahlbot.main as main_module
+
+    def fake_fetch_markets(self):
+        return [
+            Market(
+                market_id="kalshi-demo-1",
+                title="Will AfD exceed 5% in Brandenburg election?",
+                platform="kalshi",
+                market_probability=0.61,
+                yes_ask_cents=62,
+                volume_usd=18400,
+                resolution_date=date.today() + timedelta(days=30),
+            )
+        ]
+
+    def fake_build_trade_proposal(*args, **kwargs):
+        return TradeProposal(
+            action="BUY_NO",
+            market_id="kalshi-demo-1",
+            suggested_stake_usd=12.5,
+            contracts=20,
+            limit_price_cents=62,
+            ev=0.12,
+            kelly_fraction=0.08,
+        )
+
+    monkeypatch.setattr(KalshiClient, "fetch_markets", fake_fetch_markets)
+    monkeypatch.setattr(main_module, "build_trade_proposal", fake_build_trade_proposal)
+    monkeypatch.setattr(main_module, "prefilter_candidate", lambda **kwargs: (True, 0.5))
+
+    log_path = tmp_path / "trade_log.jsonl"
+    rows = run_once(bankroll_usd=1000.0, log_path=str(log_path))
+
+    assert isinstance(rows, list)
+    assert len(rows) >= 1
+    assert log_path.exists()
