@@ -1,20 +1,18 @@
 from datetime import date
+import pytest
 
 from wahlbot.agent.response_parser import AgentRecommendation
 from wahlbot.config import DEFAULT_CONFIG
 from wahlbot.decision.engine import build_trade_proposal
 from wahlbot.decision.ev_calculator import expected_value_yes
-from wahlbot.decision.filter import (
-    historical_base_rate,
-    is_close_race_market,
-    prefilter_candidate,
-)
+from wahlbot.decision.filter import historical_base_rate, is_close_race_market, prefilter_candidate
 from wahlbot.polls.aggregator import PollSnapshot, build_fallback_poll_snapshot
 from wahlbot.scanner.market_parser import Market
 
 
 def test_historical_base_rate():
-    assert historical_base_rate(4.8) == 0.30
+    # Prüft die Normalverteilungsfunktion
+    assert historical_base_rate(4.8) == pytest.approx(0.4557641189, rel=1e-6)
 
 
 def test_prefilter_candidate_edge_true():
@@ -39,7 +37,7 @@ def test_prefilter_candidate_edge_true():
         close_race_band_pct=8.0,
     )
     assert decision is True
-    assert base_rate == 0.30
+    assert base_rate == pytest.approx(historical_base_rate(4.8) + 0.03, rel=1e-6)
 
 
 def test_close_race_market_is_selected_for_research():
