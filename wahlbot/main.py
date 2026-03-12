@@ -4,22 +4,18 @@ from uuid import uuid4
 from wahlbot.agent.perplexity import PerplexityClient
 from wahlbot.agent.prompt_builder import build_research_prompt
 from wahlbot.approval.telegram_bot import build_approval_message
-from wahlbot.config import Config, DEFAULT_CONFIG
-from wahlbot.decision.engine import TradeProposal, build_trade_proposal
+from wahlbot.config import DEFAULT_CONFIG
+from wahlbot.decision.engine import build_trade_proposal
 from wahlbot.decision.filter import historical_base_rate, prefilter_candidate
 from wahlbot.execution.logger import TradeLogger
-from wahlbot.execution.order_executor import ExecutionResult, OrderExecutor
+from wahlbot.execution.order_executor import OrderExecutor
 from wahlbot.polls.aggregator import build_fallback_poll_snapshot, match_market_to_poll
 from wahlbot.scanner.kalshi import KalshiClient, scan_relevant_markets
-from wahlbot.scanner.market_parser import Market, ScannerFilters
+from wahlbot.scanner.market_parser import ScannerFilters
 
 
-def run_once(
-    bankroll_usd: float = 1000.0,
-    config: Config | None = None,
-    log_path: str = "trade_log.jsonl",
-) -> list[dict[str, str | float | int]]:
-    cfg = config or DEFAULT_CONFIG
+def run_once(bankroll_usd: float = 1000.0) -> None:
+    cfg = DEFAULT_CONFIG
     scan_filters = ScannerFilters(
         market_prob_min=cfg.market_prob_min,
         market_prob_max=cfg.market_prob_max,
@@ -32,9 +28,7 @@ def run_once(
     scanner = KalshiClient()
     agent = PerplexityClient()
     executor = OrderExecutor()
-    logger = TradeLogger(path=log_path)
-
-    rows: list[dict[str, str | float | int]] = []
+    logger = TradeLogger()
 
     for market in scan_relevant_markets(scanner, scan_filters, today=date.today()):
         poll = match_market_to_poll(market) or build_fallback_poll_snapshot(market)
@@ -54,9 +48,20 @@ def run_once(
         if not should_run_agent:
             continue
 
-        prompt = build_research_prompt(market=market, poll=poll, historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct))
+        prompt = build_research_prompt(
+            market=market,
+            poll=poll,
+            historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct),
+        )
+
         agent_result = agent.research(prompt)
-        proposal = build_trade_proposal(market=market, agent_result=agent_result, bankroll_usd=bankroll_usd, config=cfg)
+
+        proposal = build_trade_proposal(
+            market=market,
+            agent_result=agent_result,
+            bankroll_usd=bankroll_usd,
+            config=cfg,
+        )
         if proposal is None:
             continue
 
@@ -67,35 +72,6 @@ def run_once(
         # In production: wait for human approval. Here we simulate approval.
         result = executor.execute(proposal)
         logger.append(trade_id, market, proposal, agent_result, result)
-        rows.append(
-            build_result_row(
-                trade_id=trade_id,
-                market=market,
-                proposal=proposal,
-                agent_adjusted_probability=agent_result.adjusted_probability,
-                execution=result,
-            )
-        )
-
-    return rows
-
-
-def build_result_row(
-    trade_id: str,
-    market: Market,
-    proposal: TradeProposal,
-    agent_adjusted_probability: float,
-    execution: ExecutionResult,
-) -> dict[str, str | float | int]:
-    return {
-        "trade_id": trade_id,
-        "market": market.title,
-        "proposal": proposal.action,
-        "agent_adjusted_probability": round(agent_adjusted_probability, 4),
-        "ev": proposal.ev,
-        "stake_usd": proposal.suggested_stake_usd,
-        "execution_status": execution.status,
-    }
 
 
 if __name__ == "__main__":

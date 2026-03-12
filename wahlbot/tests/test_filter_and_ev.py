@@ -1,5 +1,4 @@
-from datetime import date, timedelta
-
+from datetime import date
 import pytest
 
 from wahlbot.agent.response_parser import AgentRecommendation
@@ -12,6 +11,7 @@ from wahlbot.scanner.market_parser import Market
 
 
 def test_historical_base_rate():
+    # Prüft die Normalverteilungsfunktion
     assert historical_base_rate(4.8) == pytest.approx(0.4557641189, rel=1e-6)
 
 
@@ -81,49 +81,8 @@ def test_build_trade_proposal():
         key_factors=[],
         sources=[],
     )
-    proposal = build_trade_proposal(market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG)
+    proposal = build_trade_proposal(
+        market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG
+    )
     assert proposal is not None
     assert proposal.suggested_stake_usd <= DEFAULT_CONFIG.max_stake_usd
-
-
-def test_run_once_returns_rows_and_writes_log(tmp_path, monkeypatch):
-    from wahlbot.decision.engine import TradeProposal
-    from wahlbot.main import run_once
-    from wahlbot.scanner.kalshi import KalshiClient
-    from wahlbot.scanner.market_parser import Market
-    import wahlbot.main as main_module
-
-    def fake_fetch_markets(self):
-        return [
-            Market(
-                market_id="kalshi-demo-1",
-                title="Will AfD exceed 5% in Brandenburg election?",
-                platform="kalshi",
-                market_probability=0.61,
-                yes_ask_cents=62,
-                volume_usd=18400,
-                resolution_date=date.today() + timedelta(days=30),
-            )
-        ]
-
-    def fake_build_trade_proposal(*args, **kwargs):
-        return TradeProposal(
-            action="BUY_NO",
-            market_id="kalshi-demo-1",
-            suggested_stake_usd=12.5,
-            contracts=20,
-            limit_price_cents=62,
-            ev=0.12,
-            kelly_fraction=0.08,
-        )
-
-    monkeypatch.setattr(KalshiClient, "fetch_markets", fake_fetch_markets)
-    monkeypatch.setattr(main_module, "build_trade_proposal", fake_build_trade_proposal)
-    monkeypatch.setattr(main_module, "prefilter_candidate", lambda **kwargs: (True, 0.5))
-
-    log_path = tmp_path / "trade_log.jsonl"
-    rows = run_once(bankroll_usd=1000.0, log_path=str(log_path))
-
-    assert isinstance(rows, list)
-    assert len(rows) >= 1
-    assert log_path.exists()

@@ -25,7 +25,10 @@ def extract_party_and_country(title: str) -> tuple[str | None, str | None]:
     title_lower = title.lower()
     party = next((p.upper() for p in PARTIES if p in title_lower), None)
 
-    country_match = re.search(r"\b(germany|deutschland|brandenburg|bayern|sachsen|rheinland-pfalz|rlp)\b", title_lower)
+    country_match = re.search(
+        r"\b(germany|deutschland|brandenburg|bayern|sachsen|rheinland-pfalz|rlp)\b",
+        title_lower,
+    )
     if not country_match:
         return party, None
 
