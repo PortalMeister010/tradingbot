@@ -48,9 +48,20 @@ def run_once(bankroll_usd: float = 1000.0) -> None:
         if not should_run_agent:
             continue
 
-        prompt = build_research_prompt(market=market, poll=poll, historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct))
+        prompt = build_research_prompt(
+            market=market,
+            poll=poll,
+            historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct),
+        )
+
         agent_result = agent.research(prompt)
-        proposal = build_trade_proposal(market=market, agent_result=agent_result, bankroll_usd=bankroll_usd, config=cfg)
+
+        proposal = build_trade_proposal(
+            market=market,
+            agent_result=agent_result,
+            bankroll_usd=bankroll_usd,
+            config=cfg,
+        )
         if proposal is None:
             continue
 

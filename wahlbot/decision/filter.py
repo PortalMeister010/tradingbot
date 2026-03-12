@@ -1,5 +1,4 @@
 from math import erf
-
 from wahlbot.polls.aggregator import PollSnapshot
 
 
@@ -23,6 +22,7 @@ def prefilter_candidate(
     close_race_research_enabled: bool,
     close_race_band_pct: float,
 ) -> tuple[bool, float]:
+
     if has_open_position:
         return False, 0.0
 
@@ -34,12 +34,12 @@ def prefilter_candidate(
 
     base_rate = historical_base_rate(poll.latest_poll_pct)
 
+    # Trend-Bonus
     trend_factor = 0.0
     if poll.poll_trend.lower() == "rising":
         trend_factor = 0.03
     elif poll.poll_trend.lower() == "falling":
         trend_factor = -0.03
-
     base_rate += trend_factor
 
     edge_pct = abs(market_probability - base_rate) * 100

@@ -1,5 +1,4 @@
 from datetime import date
-
 import pytest
 
 from wahlbot.agent.response_parser import AgentRecommendation
@@ -12,6 +11,7 @@ from wahlbot.scanner.market_parser import Market
 
 
 def test_historical_base_rate():
+    # Prüft die Normalverteilungsfunktion
     assert historical_base_rate(4.8) == pytest.approx(0.4557641189, rel=1e-6)
 
 
@@ -81,6 +81,8 @@ def test_build_trade_proposal():
         key_factors=[],
         sources=[],
     )
-    proposal = build_trade_proposal(market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG)
+    proposal = build_trade_proposal(
+        market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG
+    )
     assert proposal is not None
     assert proposal.suggested_stake_usd <= DEFAULT_CONFIG.max_stake_usd

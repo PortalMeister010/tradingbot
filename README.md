@@ -12,10 +12,3 @@ A modular Python scaffold for an automated prediction market bot focused on elec
 
 ```bash
 python -m wahlbot.main
-```
-
-## Test
-
-```bash
-pytest
-```
