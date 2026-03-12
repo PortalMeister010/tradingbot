@@ -20,12 +20,20 @@ class Config:
     market_prob_max: float = 0.80
     resolution_min_days: int = 3
     resolution_max_days: int = 365
+    close_race_research_enabled: bool = True
+    close_race_band_pct: float = 8.0
     election_keywords: tuple[str, ...] = field(
         default_factory=lambda: (
             "election",
             "party",
             "threshold",
             "parliament",
+            "landtagswahl",
+            "state election",
+            "ministerpraesident",
+            "ministerpräsident",
+            "rheinland-pfalz",
+            "rlp",
             "afd",
             "fdp",
             "linke",

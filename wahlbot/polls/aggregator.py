@@ -18,19 +18,40 @@ class PollSnapshot:
 
 
 PARTIES = ("afd", "fdp", "spd", "cdu", "csu", "gruene", "linke")
+REGIONS = ("germany", "deutschland", "brandenburg", "bayern", "sachsen", "rheinland-pfalz", "rlp")
 
 
 def extract_party_and_country(title: str) -> tuple[str | None, str | None]:
     title_lower = title.lower()
     party = next((p.upper() for p in PARTIES if p in title_lower), None)
 
-    country_match = re.search(r"\b(germany|deutschland|brandenburg|bayern|sachsen)\b", title_lower)
+    country_match = re.search(
+        r"\b(germany|deutschland|brandenburg|bayern|sachsen|rheinland-pfalz|rlp)\b",
+        title_lower,
+    )
     if not country_match:
         return party, None
 
     token = country_match.group(1)
-    country = "DE" if token in {"germany", "deutschland", "brandenburg", "bayern", "sachsen"} else token.upper()
+    country = "DE" if token in REGIONS else token.upper()
     return party, country
+
+
+def build_fallback_poll_snapshot(market: Market) -> PollSnapshot | None:
+    party, country = extract_party_and_country(market.title)
+    if not country:
+        return None
+
+    return PollSnapshot(
+        party=party or "UNKNOWN",
+        country=country,
+        election=f"{country} election market",
+        latest_poll_pct=market.market_probability * 100,
+        poll_trend="stable",
+        poll_date=date.today(),
+        institute="market-implied",
+        historical_bias_correction=0.0,
+    )
 
 
 def match_market_to_poll(market: Market) -> PollSnapshot | None:

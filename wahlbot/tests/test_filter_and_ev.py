@@ -1,12 +1,16 @@
 from datetime import date
 
+from wahlbot.agent.response_parser import AgentRecommendation
 from wahlbot.config import DEFAULT_CONFIG
 from wahlbot.decision.engine import build_trade_proposal
 from wahlbot.decision.ev_calculator import expected_value_yes
-from wahlbot.decision.filter import historical_base_rate, prefilter_candidate
-from wahlbot.polls.aggregator import PollSnapshot
+from wahlbot.decision.filter import (
+    historical_base_rate,
+    is_close_race_market,
+    prefilter_candidate,
+)
+from wahlbot.polls.aggregator import PollSnapshot, build_fallback_poll_snapshot
 from wahlbot.scanner.market_parser import Market
-from wahlbot.agent.response_parser import AgentRecommendation
 
 
 def test_historical_base_rate():
@@ -31,9 +35,30 @@ def test_prefilter_candidate_edge_true():
         poll_window_max_pct=7.0,
         min_edge_pct=10,
         has_open_position=False,
+        close_race_research_enabled=True,
+        close_race_band_pct=8.0,
     )
     assert decision is True
     assert base_rate == 0.30
+
+
+def test_close_race_market_is_selected_for_research():
+    assert is_close_race_market(0.51, close_race_band_pct=8.0) is True
+
+
+def test_build_fallback_poll_snapshot_for_state_election_market():
+    market = Market(
+        market_id="m2",
+        title="Will CDU win Rheinland-Pfalz landtagswahl?",
+        platform="kalshi",
+        market_probability=0.49,
+        yes_ask_cents=49,
+        volume_usd=10000,
+        resolution_date=date(2026, 3, 1),
+    )
+    snapshot = build_fallback_poll_snapshot(market)
+    assert snapshot is not None
+    assert snapshot.country == "DE"
 
 
 def test_expected_value_yes_positive():
@@ -58,6 +83,8 @@ def test_build_trade_proposal():
         key_factors=[],
         sources=[],
     )
-    proposal = build_trade_proposal(market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG)
+    proposal = build_trade_proposal(
+        market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG
+    )
     assert proposal is not None
     assert proposal.suggested_stake_usd <= DEFAULT_CONFIG.max_stake_usd

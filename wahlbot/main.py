@@ -9,7 +9,7 @@ from wahlbot.decision.engine import build_trade_proposal
 from wahlbot.decision.filter import historical_base_rate, prefilter_candidate
 from wahlbot.execution.logger import TradeLogger
 from wahlbot.execution.order_executor import OrderExecutor
-from wahlbot.polls.aggregator import match_market_to_poll
+from wahlbot.polls.aggregator import build_fallback_poll_snapshot, match_market_to_poll
 from wahlbot.scanner.kalshi import KalshiClient, scan_relevant_markets
 from wahlbot.scanner.market_parser import ScannerFilters
 
@@ -31,7 +31,7 @@ def run_once(bankroll_usd: float = 1000.0) -> None:
     logger = TradeLogger()
 
     for market in scan_relevant_markets(scanner, scan_filters, today=date.today()):
-        poll = match_market_to_poll(market)
+        poll = match_market_to_poll(market) or build_fallback_poll_snapshot(market)
         if poll is None:
             continue
 
@@ -42,13 +42,26 @@ def run_once(bankroll_usd: float = 1000.0) -> None:
             poll_window_max_pct=cfg.poll_window_max_pct,
             min_edge_pct=cfg.min_edge_pct,
             has_open_position=False,
+            close_race_research_enabled=cfg.close_race_research_enabled,
+            close_race_band_pct=cfg.close_race_band_pct,
         )
         if not should_run_agent:
             continue
 
-        prompt = build_research_prompt(market=market, poll=poll, historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct))
+        prompt = build_research_prompt(
+            market=market,
+            poll=poll,
+            historical_base_rate=base_rate or historical_base_rate(poll.latest_poll_pct),
+        )
+
         agent_result = agent.research(prompt)
-        proposal = build_trade_proposal(market=market, agent_result=agent_result, bankroll_usd=bankroll_usd, config=cfg)
+
+        proposal = build_trade_proposal(
+            market=market,
+            agent_result=agent_result,
+            bankroll_usd=bankroll_usd,
+            config=cfg,
+        )
         if proposal is None:
             continue
 
