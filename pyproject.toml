@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wahlbot"
+version = "0.1.0"
+description = "Automated prediction market bot for 5%% threshold election markets"
+requires-python = ">=3.10"
+dependencies = [
+  "requests>=2.31.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["wahlbot/tests"]
