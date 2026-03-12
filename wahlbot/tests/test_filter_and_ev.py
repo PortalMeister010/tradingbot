@@ -4,7 +4,11 @@ from wahlbot.agent.response_parser import AgentRecommendation
 from wahlbot.config import DEFAULT_CONFIG
 from wahlbot.decision.engine import build_trade_proposal
 from wahlbot.decision.ev_calculator import expected_value_yes
-from wahlbot.decision.filter import historical_base_rate, is_close_race_market, prefilter_candidate
+from wahlbot.decision.filter import (
+    historical_base_rate,
+    is_close_race_market,
+    prefilter_candidate,
+)
 from wahlbot.polls.aggregator import PollSnapshot, build_fallback_poll_snapshot
 from wahlbot.scanner.market_parser import Market
 
@@ -79,6 +83,8 @@ def test_build_trade_proposal():
         key_factors=[],
         sources=[],
     )
-    proposal = build_trade_proposal(market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG)
+    proposal = build_trade_proposal(
+        market, agent, bankroll_usd=1000, config=DEFAULT_CONFIG
+    )
     assert proposal is not None
     assert proposal.suggested_stake_usd <= DEFAULT_CONFIG.max_stake_usd

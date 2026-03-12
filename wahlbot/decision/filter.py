@@ -33,10 +33,13 @@ def prefilter_candidate(
     close_race_research_enabled: bool,
     close_race_band_pct: float,
 ) -> tuple[bool, float]:
+
     if has_open_position:
         return False, 0.0
 
-    if close_race_research_enabled and is_close_race_market(market_probability, close_race_band_pct):
+    if close_race_research_enabled and is_close_race_market(
+        market_probability, close_race_band_pct
+    ):
         return True, market_probability
 
     if not (poll_window_min_pct <= poll.latest_poll_pct <= poll_window_max_pct):
